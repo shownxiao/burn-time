@@ -79,6 +79,15 @@ class MainWindows(QMainWindow):
         self.mainLayout.addLayout(self.menuLayout)
         self.mainWidget.setLayout(self.mainLayout)
         self.setCentralWidget(self.mainWidget)
+    
+    def open(self):
+        imgName, imgType = QFileDialog.getOpenFileName(self, "打开图片", self.imgPath, "*.jpg;;*.png;;All Files(*)")
+        jpg = QPixmap(imgName).scaled(self.pictureLabel.width(), self.pictureLabel.height())
+        self.pictureLabel.setPixmap(jpg)
+        # print(imgName, imgType)
+        self.imgPath = '/'.join(imgName.split('/')[:-1])
+        self.aValueEdit.setText("")
+        self.compute(imgName, 2)
 
 
 # 系统入口
