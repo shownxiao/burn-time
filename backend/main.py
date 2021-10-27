@@ -3,6 +3,7 @@ import codecs
 import numpy as np
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
+from PyQt5.QtCore import *
 import config
 import json
 import xlrd
@@ -27,7 +28,7 @@ class MainWindows(QMainWindow):
 
         self.mainWidget = QWidget(self)
         self.Label1 = QLabel("材料种类:")
-        self.Label2 = QLabel("材料厚度:")
+        self.Label2 = QLabel("材料厚度(mm):")
         self.Label3 = QLabel("材料制备工艺:")
         self.Label4 = QLabel("材料体系:")
         self.Label5 = QLabel("环境条件:")
@@ -66,9 +67,10 @@ class MainWindows(QMainWindow):
         self.Edit6.setEnabled(False)
         self.Edit7.setEnabled(False)
         self.Edit8.setEnabled(False)
+        # self.Edit2.setValidator(QRegExpValidator(QRegExp("[0-9]{12}.[0-9]{6}"), self))
 
         # 设置事件
-        self.databaseButton.clicked.connect(self.configOpen)
+        self.databaseButton.clicked.connect(self.databaseOpen)
         self.thicknessButton.clicked.connect(self.thicknessOpen)
         self.temperatureButton.clicked.connect(self.temperatureOpen)
         self.confirmButton.clicked.connect(self.upload)
@@ -124,37 +126,62 @@ class MainWindows(QMainWindow):
                 }
                 json.dump(data, f, ensure_ascii=False)
                 f.write('\n')
-                QMessageBox.critical(self, "成果", "上传成功！")
+                QMessageBox.information(self, "成功", "上传成功！")
         else:
             QMessageBox.critical(self, "错误", "请输入完整信息！")
             
     
-    def configOpen(self):
-        databaseName, databaseType = QFileDialog.getOpenFileName(self, "打开数据库文件", self.config_path, "*.txt;;All Files(*)")
-        self.config_path = '/'.join(databaseName.split('/')[:-1])
-        self.Edit6.setText(databaseName)
+    def databaseOpen(self):
+        try:
+            databaseName, databaseType = QFileDialog.getOpenFileName(self, "打开数据库文件", self.config_path, "*.txt;;All Files(*)")
+            self.config_path = '/'.join(databaseName.split('/')[:-1])
+            self.Edit6.setText(databaseName)
+        except FileNotFoundError:
+            QMessageBox.critical(self, "错误", "请选择文件！")
     
     def thicknessOpen(self):
-        thicknessName, thicknessType = QFileDialog.getOpenFileName(self, "打开厚度数据文件", self.thickness_path, "*.xlsx;;*.xls;;All Files(*)")
-        self.thickness_path = '/'.join(thicknessName.split('/')[:-1])
-        self.Edit7.setText(thicknessName)
-        data = xlrd.open_workbook(thicknessName)
-        table = data.sheets()[0]
-        for rown in range(1, table.nrows):
-            if(table.cell(rown, 0).value.is_integer()):
-                self.temperature_x.append(table.cell(rown, 0).value)
-                self.temperature_y.append(table.cell(rown, 1).value)
+        try:
+            begin_thickness = float(self.Edit2.text())
+        except ValueError:
+            QMessageBox.critical(self, "错误", "厚度请输入正确的数字！")
+            return
+        try:
+            if not self.Edit2.text():
+                QMessageBox.critical(self, "错误", "请先输入初始厚度！")
+                return
+            thicknessName, thicknessType = QFileDialog.getOpenFileName(self, "打开厚度数据文件", self.thickness_path, "*.xlsx;;*.xls;;All Files(*)")
+            self.thickness_path = '/'.join(thicknessName.split('/')[:-1])
+            self.Edit7.setText(thicknessName)
+            data = xlrd.open_workbook(thicknessName)
+            table = data.sheets()[0]
+            self.thickness_x = [0]
+            self.thickness_y = [begin_thickness]
+            for rown in range(1, table.nrows):
+                begin_x = int(self.thickness_x[-1])
+                end_x = int(table.cell(rown, 0).value)
+                begin_y = float(self.thickness_y[-1])
+                end_y = begin_y - float(table.cell(rown, 1).value)
+                for index in range(begin_x + 1, end_x + 1):
+                    self.thickness_x.append(int(index))
+                    self.thickness_y.append(float('%.3f' % (begin_y - (begin_y -  end_y) * (index - begin_x) / (end_x - begin_x))))
+        except FileNotFoundError:
+            QMessageBox.critical(self, "错误", "请选择文件！")
     
     def temperatureOpen(self):
-        temperatureName, temperatureType = QFileDialog.getOpenFileName(self, "打开温度数据文件", self.temperature_path, "*.xlsx;;*.xls;;All Files(*)")
-        self.temperature_path = '/'.join(temperatureName.split('/')[:-1])
-        self.Edit8.setText(temperatureName)
-        data = xlrd.open_workbook(temperatureName)
-        table = data.sheets()[0]
-        for rown in range(1, table.nrows):
-            if(table.cell(rown, 0).value.is_integer()):
-                self.temperature_x.append(table.cell(rown, 0).value)
-                self.temperature_y.append(table.cell(rown, 1).value)
+        try:
+            temperatureName, temperatureType = QFileDialog.getOpenFileName(self, "打开温度数据文件", self.temperature_path, "*.xlsx;;*.xls;;All Files(*)")
+            self.temperature_path = '/'.join(temperatureName.split('/')[:-1])
+            self.Edit8.setText(temperatureName)
+            data = xlrd.open_workbook(temperatureName)
+            table = data.sheets()[0]
+            self.temperature_x = []
+            self.temperature_y = []
+            for rown in range(1, table.nrows):
+                if(table.cell(rown, 0).value.is_integer()):
+                    self.temperature_x.append(int(table.cell(rown, 0).value))
+                    self.temperature_y.append(int(table.cell(rown, 1).value))
+        except FileNotFoundError:
+            QMessageBox.critical(self, "错误", "请选择文件！")
 
 
 # 系统入口
